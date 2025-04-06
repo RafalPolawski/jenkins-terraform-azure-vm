@@ -1,0 +1,28 @@
+---
+# Zmienne specyficzne dla RedHat/CentOS
+os_family: "redhat"
+package_manager: "yum"
+firewall_service: "firewalld"
+
+# Pakiety do instalacji
+common_packages:
+  - curl
+  - ca-certificates
+  - gnupg
+  - redhat-lsb-core
+
+# Konfiguracje specyficzne dla pakietów
+nginx_service: "nginx"
+nginx_user: "nginx"
+nginx_conf_path: "/etc/nginx/nginx.conf"
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+
+python_packages:
+  - python3
+  - python3-pip
+
+java_package: "java-11-openjdk-devel"

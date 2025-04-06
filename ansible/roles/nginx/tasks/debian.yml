@@ -1,0 +1,15 @@
+---
+# roles/nginx/tasks/debian.yml
+- name: Install nginx (Debian/Ubuntu)
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Ensure nginx is running and enabled (Debian/Ubuntu)
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+  become: yes

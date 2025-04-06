@@ -1,0 +1,25 @@
+---
+# Wspólne zadania dla wszystkich systemów
+
+# Sprawdzenie podstawowych wymagań przed kontynuacją
+- name: Check for minimum requirements
+  assert:
+    that:
+      - ansible_system is defined
+      - ansible_distribution is defined
+    fail_msg: "Nie można określić systemu operacyjnego - sprawdź połączenie SSH"
+
+# Aktualizacja repozytorium pakietów odpowiednia dla danego systemu
+- name: Update package cache
+  include_tasks: "{{ os_family }}_update.yml"
+
+# Instalacja wspólnych pakietów
+- name: Install common packages
+  package:
+    name: "{{ common_packages }}"
+    state: present
+
+# Konfiguracja czasu - wartość domyślna jeśli nie podano w wierszu poleceń
+- name: Set timezone
+  timezone:
+    name: "{{ timezone | default('UTC') }}"

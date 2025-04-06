@@ -1,0 +1,15 @@
+---
+# roles/nginx/tasks/main.yml
+- name: Install nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Ensure nginx is running and enabled
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+  become: yes

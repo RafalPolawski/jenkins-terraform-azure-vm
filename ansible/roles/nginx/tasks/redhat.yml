@@ -1,0 +1,20 @@
+---
+# roles/nginx/tasks/redhat.yml
+- name: Install EPEL Repository (RHEL/CentOS)
+  yum:
+    name: epel-release
+    state: present
+  become: yes
+
+- name: Install nginx (RHEL/CentOS)
+  yum:
+    name: nginx
+    state: present
+  become: yes
+
+- name: Ensure nginx is running and enabled (RHEL/CentOS)
+  systemd:
+    name: nginx
+    state: started
+    enabled: yes
+  become: yes

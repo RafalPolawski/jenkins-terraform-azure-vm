@@ -1,0 +1,19 @@
+---
+# Zadania instalacji Docker
+
+# Instalacja specyficzna dla systemu operacyjnego
+- name: Include OS specific tasks
+  include_tasks: "{{ os_family }}.yml"
+
+# Konfiguracja wspólna dla wszystkich systemów
+- name: Ensure Docker service is running and enabled
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes

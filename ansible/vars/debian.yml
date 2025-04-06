@@ -1,0 +1,31 @@
+---
+# Zmienne specyficzne dla Debian/Ubuntu
+os_family: "debian"
+package_manager: "apt"
+firewall_service: "ufw"
+
+# Pakiety do instalacji
+common_packages:
+  - curl
+  - software-properties-common
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+
+# Konfiguracje specyficzne dla pakietów
+nginx_service: "nginx"
+nginx_user: "www-data"
+nginx_conf_path: "/etc/nginx/nginx.conf"
+
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+
+python_packages:
+  - python3
+  - python3-pip
+  - python3-venv
+
+java_package: "default-jdk"

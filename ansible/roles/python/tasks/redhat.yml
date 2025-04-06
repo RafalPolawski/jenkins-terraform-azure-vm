@@ -1,0 +1,28 @@
+---
+# roles/python/tasks/redhat.yml
+- name: Install Python and required packages (RHEL/CentOS)
+  yum:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  with_items:
+    - python3
+    - python3-pip
+    - python3-devel
+    - gcc
+    - openssl-devel
+    - libffi-devel
+
+- name: Create symlink for python command (RHEL/CentOS)
+  file:
+    src: /usr/bin/python3
+    dest: /usr/bin/python
+    state: link
+  become: yes
+  ignore_errors: yes
+
+- name: Upgrade pip to latest version (RHEL/CentOS)
+  pip:
+    name: pip
+    state: latest
+  become: yes

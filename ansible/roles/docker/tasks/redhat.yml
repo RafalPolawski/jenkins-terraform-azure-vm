@@ -1,0 +1,39 @@
+---
+# roles/docker/tasks/redhat.yml
+- name: Install required packages (RHEL/CentOS)
+  yum:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  with_items:
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2
+
+- name: Add Docker repository (RHEL/CentOS)
+  command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+  become: yes
+
+- name: Install Docker packages (RHEL/CentOS)
+  yum:
+    name: "{{ item }}"
+    state: present
+  become: yes
+  with_items:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+
+- name: Ensure docker service is running and enabled (RHEL/CentOS)
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Add current user to docker group (RHEL/CentOS)
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: yes

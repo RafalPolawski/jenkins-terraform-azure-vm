@@ -1,0 +1,15 @@
+---
+# Domyślne wartości dla wszystkich hostów
+# Te wartości można nadpisać poprzez parametry wiersza poleceń
+
+# Kontrola instalacji komponentów (domyślnie wyłączone)
+install_nginx: false
+install_docker: false
+install_nodejs: false
+install_python: false 
+install_java: false
+
+# Wspólne ustawienia konfiguracyjne z bezpiecznymi wartościami domyślnymi
+timezone: "UTC"
+ssh_port: 22
+firewall_enabled: true

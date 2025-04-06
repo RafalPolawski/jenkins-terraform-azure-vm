@@ -1,0 +1,5 @@
+---
+# Aktualizacja pakietów dla RedHat/CentOS
+- name: Update yum cache
+  yum:
+    update_cache: yes

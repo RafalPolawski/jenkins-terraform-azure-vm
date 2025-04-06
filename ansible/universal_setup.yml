@@ -1,0 +1,32 @@
+---
+# Universal playbook for configuring environments across different operating systems
+# Usage: ansible-playbook -i 'host1,host2' universal_setup.yml -e "install_nginx=true"
+# Alternatively: ansible-playbook universal_setup.yml -e "install_nginx=true" --limit host1
+
+- name: Universal Server Setup
+  hosts: all  # Działa z dowolnymi hostami podanymi w wierszu poleceń
+  become: true  # Wymaga uprawnień sudo
+
+  pre_tasks:
+    - name: Gather facts
+      setup:
+    
+    # Ładowanie zmiennych specyficznych dla systemu operacyjnego
+    - name: Include OS-specific variables
+      include_vars: "{{ item }}"
+      with_first_found:
+        - "vars/{{ ansible_distribution | lower }}.yml"
+        - "vars/{{ ansible_os_family | lower }}.yml"
+        - "vars/default.yml"
+
+  # Używanie ról dla różnych komponentów
+  roles:
+    - role: common
+    - role: nginx
+      when: install_nginx | default(false) | bool
+    - role: docker
+      when: install_docker | default(false) | bool
+    - role: python
+      when: install_python | default(false) | bool
+    - role: java
+      when: install_java | default(false) | bool
