@@ -1,19 +1,19 @@
-# File /terraform/modules/resource_group/variables.tf
+# File: terraform/modules/resource_group/variables.tf
+# Zmienne wejściowe dla modułu grupy zasobów.
 
-# Unikalny identyfikownik użytkownika
 variable "user_id" {
-  description = "Unikalny identyfikator użytkownika (wymagany dla nazewnictwa i tagów)"
+  description = "Unikalny identyfikator użytkownika, używany do nazewnictwa grupy zasobów."
   type        = string
+  sensitive   = true
 }
 
-# Lokalizacja zasobów
 variable "location" {
-  description = "Docelowy region Azure"
+  description = "Region Azure, w którym zostanie utworzona grupa zasobów."
   type        = string
 }
 
-# Tagi
 variable "tags" {
-  description = "Tagi do przypisania zasobom"
+  description = "Mapa tagów do zastosowania dla grupy zasobów."
   type        = map(string)
+  default     = {}
 }

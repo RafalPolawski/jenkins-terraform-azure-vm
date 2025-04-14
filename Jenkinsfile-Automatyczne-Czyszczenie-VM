@@ -1,0 +1,165 @@
+// File: Jenkinsfile-Automatyczne-Czyszczenie-VM
+// Jenkinsfile dla zadania automatycznego czyszczenia przeterminowanych maszyn wirtualnych.
+// Ten job uruchamia się cyklicznie, wyszukuje VM z tagiem DestroyTimestampUTC,
+// porównuje go z aktualnym czasem i wyzwala główny job zarządzania VM w trybie 'destroy'.
+
+// Importy
+// Do pracy z czasem (porównywanie znaczników czasu)
+import java.time.Instant
+// Do parsowania odpowiedzi JSON z Azure CLI
+import groovy.json.JsonSlurper
+
+// --- KONFIGURACJA ---
+// Nazwa głównego joba Jenkins, który zarządza tworzeniem/niszczeniem VM.
+// Ten job będzie wywoływany przez zadanie czyszczące.
+def VM_MANAGEMENT_JOB_NAME = 'Tworzenie maszyny wirtualnej'
+
+// ID poświadczeń Azure Service Principal używanych w Jenkins.
+// Muszą być te same dla obu jobów (zarządzającego i czyszczącego).
+def AZURE_CREDENTIALS_ID = 'AZURE_CREDENTIALS'
+
+// Domyślne/placeholderowe nazwy obrazów używane podczas wywoływania akcji 'destroy'.
+// Terraform 'destroy' wymaga podania zmiennej image_name, mimo że jej nie używa.
+// Musimy podać poprawną nazwę obrazu pasującą do OS_TYPE odczytanego z tagu VM.
+def DEFAULT_LINUX_IMAGE_PLACEHOLDER = 'Ubuntu:22.04-lts-gen2' // Domyślny obraz dla Linux
+def DEFAULT_WINDOWS_IMAGE_PLACEHOLDER = 'WindowsServer:2022-datacenter-smalldisk' // Domyślny obraz dla Windows
+// --- KONIEC KONFIGURACJI ---
+
+pipeline {
+    agent any // Może być prosty agent z dostępem do Azure CLI.
+
+    options {
+        // Nie pobieraj kodu źródłowego, ten job nie potrzebuje plików z repozytorium.
+        skipDefaultCheckout true
+        // Nie pozwalaj na równoczesne uruchamianie tego joba, aby uniknąć konfliktów.
+        disableConcurrentBuilds()
+    }
+    triggers {
+        // Uruchamiaj job cyklicznie, np. co 15 minut.
+        // 'H' rozkłada uruchomienia w danym okresie, aby uniknąć jednoczesnego startu wielu jobów.
+        cron('H/15 * * * *')
+    }
+    stages {
+        // Główny etap: znajduje przeterminowane VM i wyzwala dla nich zadanie niszczenia.
+        stage('Find and Trigger Destroy for Expired VMs') {
+            steps {
+                // Użyj poświadczeń Azure.
+                withCredentials([azureServicePrincipal(AZURE_CREDENTIALS_ID)]) {
+                    script {
+                        echo 'Uruchamianie sprawdzania przeterminowanych maszyn wirtualnych...'
+                        // Pobierz aktualny czas UTC.
+                        def nowUTC = Instant.now()
+                        echo "Aktualny czas UTC: ${nowUTC}"
+
+                        def vmListJson = '' // Zmienna na odpowiedź JSON z Azure CLI
+                        try {
+                            echo 'Pobieranie listy VM z tagami DestroyTimestampUTC, OwnerId, OsType...'
+                            // Użyj Azure CLI do pobrania listy VM, które mają ustawione wszystkie wymagane tagi.
+                            // Query JMESPath filtruje VM i wybiera tylko potrzebne pola: name, resourceGroup, destroyTime, ownerId, osType.
+                            vmListJson = sh(script: '''
+                                az vm list --query "[?tags.DestroyTimestampUTC != null && tags.OwnerId != null && tags.OsType != null].{ \\
+                                    name: name, \\
+                                    resourceGroup: resourceGroup, \\
+                                    destroyTime: tags.DestroyTimestampUTC, \\
+                                    ownerId: tags.OwnerId, \\
+                                    osType: tags.OsType \\
+                                }" -o json --only-show-errors
+                            ''', returnStdout: true).trim()
+                        } catch (Exception e) {
+                            // Błąd podczas komunikacji z Azure jest krytyczny.
+                            error("KRYTYCZNY BŁĄD podczas pobierania listy VM z Azure: ${e.message}")
+                        }
+
+                        // Sprawdź, czy odpowiedź JSON jest pusta lub nieprawidłowa.
+                        if (vmListJson == '[]' || vmListJson == '' || vmListJson == null) {
+                            echo 'Nie znaleziono maszyn wirtualnych z wymaganymi tagami (DestroyTimestampUTC, OwnerId, OsType).'
+                            return // Zakończ ten etap, jeśli nie ma VM do sprawdzenia.
+                        }
+
+                        def vmList = [] // Lista do przechowania sparsowanych danych VM.
+                        try {
+                            // Sparsuj odpowiedź JSON na listę map Groovy.
+                            vmList = new JsonSlurper().parseText(vmListJson) as ArrayList<HashMap>
+                        } catch (Exception e) {
+                            error("Błąd parsowania JSON z listą VM: ${e.message}. Otrzymany JSON: ${vmListJson}")
+                        }
+
+                        // Sprawdź, czy lista po parsowaniu jest pusta.
+                        if (vmList.isEmpty()) {
+                            echo 'Nie znaleziono maszyn wirtualnych z wymaganymi tagami po parsowaniu.'
+                            return
+                        }
+
+                        echo "Znaleziono ${vmList.size()} maszyn do sprawdzenia."
+                        def triggeredDestroys = 0 // Licznik wyzwolonych zadań niszczenia.
+
+                        // Przetwórz każdą znalezioną maszynę wirtualną.
+                        vmList.each { vm ->
+                            // Podstawowa walidacja danych dla pojedynczej VM.
+                            if (!vm.name || !vm.resourceGroup || !vm.destroyTime || !vm.ownerId || !vm.osType) {
+                                echo "OSTRZEŻENIE: Pomijanie VM z niekompletnymi danymi tagów: ${vm}"
+                                return // Przejdź do następnej VM w pętli 'each'.
+                            }
+
+                            echo "Sprawdzanie VM: ${vm.name} (Właściciel: ${vm.ownerId}, Grupa zasobów: ${vm.resourceGroup})"
+                            try {
+                                // Sparsuj znacznik czasu zniszczenia (string ISO 8601) na obiekt Instant.
+                                def expiryInstant = Instant.parse(vm.destroyTime)
+                                echo "  Zaplanowany czas zniszczenia: ${expiryInstant}"
+
+                                // Porównaj czas zniszczenia z aktualnym czasem UTC.
+                                if (nowUTC.isAfter(expiryInstant)) {
+                                    echo "  >>> Przeterminowana! Wyzwalanie zadania niszczenia dla użytkownika ${vm.ownerId}..."
+
+                                    // Odczytaj typ systemu operacyjnego z tagu i przekonwertuj na małe litery.
+                                    def osTypeParam = vm.osType.toLowerCase()
+
+                                    // Wybierz odpowiednią placeholderową nazwę obrazu na podstawie osType.
+                                    def validImageNamePlaceholder = ''
+                                    if (osTypeParam == 'linux') {
+                                        validImageNamePlaceholder = DEFAULT_LINUX_IMAGE_PLACEHOLDER
+                                    } else if (osTypeParam == 'windows') {
+                                        validImageNamePlaceholder = DEFAULT_WINDOWS_IMAGE_PLACEHOLDER
+                                    } else {
+                                        // Jeśli OsType jest nieznany, zgłoś błąd i pomiń tę VM.
+                                        echo "  BŁĄD: Nieznany OsType ('${vm.osType}') odczytany z tagów dla VM ${vm.name}. Nie można wybrać poprawnego IMAGE_NAME. Pomijanie."
+                                        return // Przejdź do następnej VM.
+                                    }
+                                    echo "  Używanie poprawnej nazwy obrazu jako placeholdera: ${validImageNamePlaceholder}"
+
+                                    // Wyzwól główny job zarządzania VM z odpowiednimi parametrami.
+                                    build(
+                                        job: VM_MANAGEMENT_JOB_NAME, // Nazwa joba do wywołania
+                                        parameters: [
+                                            // Przekaż parametry wymagane przez job zarządzający dla akcji 'destroy'.
+                                            string(name: 'ACTION', value: 'destroy'),                 // Ustaw akcję na destroy
+                                            string(name: 'TARGET_USER_ID', value: vm.ownerId),        // Wskaż właściciela VM
+                                            string(name: 'OS_TYPE', value: osTypeParam),              // Przekaż typ OS z tagu
+                                            string(name: 'IMAGE_NAME', value: validImageNamePlaceholder) // Przekaż placeholder obrazu
+                                        // Pozostałe parametry (np. DESTROY_AFTER, INSTALL_*) nie są potrzebne dla 'destroy'.
+                                        ],
+                                        wait: false // Nie czekaj na zakończenie wyzwolonego joba.
+                                    )
+                                    triggeredDestroys++ // Zwiększ licznik wyzwolonych zadań.
+                                    echo "  Zadanie niszczenia dla VM ${vm.name} zostało wyzwolone."
+
+                                    // Małe opóźnienie między wyzwalaniem zadań, aby nie obciążać nadmiernie Jenkinsa/Azure.
+                                    sleep(time: 3, unit: 'SECONDS')
+                                } else {
+                                    // Jeśli czas zniszczenia jeszcze nie nadszedł.
+                                    echo '  Jeszcze nie czas na zniszczenie.'
+                                }
+                            } catch (Exception e) {
+                                // Złap błędy podczas przetwarzania pojedynczej VM (np. błąd parsowania czasu).
+                                echo "  BŁĄD podczas przetwarzania VM ${vm.name} (Timestamp: '${vm.destroyTime}'): ${e.message}. Pomijanie tej VM."
+                            // Kontynuuj przetwarzanie następnych VM.
+                            }
+                        } // Koniec pętli vmList.each
+
+                        echo "Zakończono sprawdzanie. Wyzwolono ${triggeredDestroys} zadań niszczenia."
+                    } // Koniec bloku script
+                } // Koniec withCredentials
+            } // Koniec steps
+        } // Koniec stage
+    } // Koniec stages
+} // Koniec pipeline

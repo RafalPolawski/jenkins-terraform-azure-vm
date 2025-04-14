@@ -1,0 +1,28 @@
+# Katalog z pobieranymi providerami i stanem
+
+# Pliki stanu Terraform (mogą zawierać wrażliwe dane)
+terraform.tfstate
+terraform.tfstate.backup
+.terraform.tfstate.lock*
+# Zmienne środowiskowe i wrażliwe dane
+
+# Pliki konfiguracyjne CLI Terraform
+.terraform
+.terraform.lock.hcl
+
+# Pliki override (zwykle używane lokalnie)
+
+# =============================================
+# Klucze i certyfikaty
+# =============================================
+
+# Visual Studio Code
+
+# =============================================
+# Logi i pliki tymczasowe
+# =============================================
+
+# =============================================
+# Plik z danymi uwierzytelniającymi do Packer
+# =============================================
+credentials.pkrvars.hcl

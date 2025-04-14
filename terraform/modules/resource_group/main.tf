@@ -1,18 +1,10 @@
-# File: /terraform/modules/resource_group/main.tf
+# File: terraform/modules/resource_group/main.tf
+# Moduł odpowiedzialny za tworzenie grupy zasobów Azure.
 
-# Best Practice: Jedna grupa zasobów na środowisko/użytkownika
+# Definicja zasobu grupy zasobów.
 resource "azurerm_resource_group" "this" {
-  name     = "student-${var.user_id}-rg"  # Unikalna nazwa z prefixem
-  location = var.location  # Dziedziczenie regionu z zmiennych
-  tags     = var.tags  # Meta-dane dla zarządzania i kosztów
-}
-
-# Eksport nazwy grupy dla zależnych modułów
-output "resource_group_name" {
-  value = azurerm_resource_group.this.name
-}
-
-# Eksport regionu aby zapewnić spójność w całej infrastrukturze
-output "location" {
-  value = azurerm_resource_group.this.location
+  # Nazwa grupy zasobów tworzona dynamicznie z użyciem user_id dla unikalności.
+  name     = "student-${var.user_id}-rg"
+  location = var.location
+  tags     = var.tags
 }

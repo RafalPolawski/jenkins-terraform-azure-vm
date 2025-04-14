@@ -1,64 +1,92 @@
-# File: /terraform/variables.tf
-# Definicja zmiennych wejściowych dla całej konfiguracji
+# File: terraform/variables.tf
+# Definicje głównych zmiennych wejściowych dla całej konfiguracji Terraform.
 
-# Unikalny identyfikator użytkownika
 variable "user_id" {
-  description = "Unikalny identyfikator użytkownika (wymagany dla nazewnictwa i tagów)"
+  description = "Unikalny identyfikator użytkownika (np. login), używany do nazewnictwa zasobów."
   type        = string
+  sensitive   = true # Identyfikator użytkownika jest traktowany jako dana wrażliwa.
 }
 
-# Dane dostępowe administratora
 variable "admin_username" {
-  description = "Nazwa użytkownika z uprawnieniami administratorskimi"
+  description = "Nazwa użytkownika administratora tworzonego na maszynie wirtualnej."
   type        = string
-  default     = "studentadmin"  # Wartość domyślna dla szkoleń
+  sensitive   = true
 }
 
 variable "admin_password" {
-  description = "Hasło administratora"
+  description = "Hasło administratora VM. Wymagane tylko dla systemu Windows."
   type        = string
-  sensitive   = true  # Oznaczenie jako wrażliwe
-  default     = "StudentPassword123!"  # Tylko dla środowisk testowych!
+  sensitive   = true
 }
 
-# Wybór systemu operacyjnego z walidacją wartości
 variable "os_type" {
-  description = "Wybór między 'linux' a 'windows' (case-insensitive)"
+  description = "Typ systemu operacyjnego do zainstalowania na VM ('linux' lub 'windows'). Wpływa na wybór obrazu, rozmiaru VM i metody logowania."
   type        = string
+  sensitive   = false
   validation {
+    # Zapewnia, że podano poprawną wartość dla typu OS.
     condition     = contains(["linux", "windows"], lower(var.os_type))
-    error_message = "Dozwolone wartości: 'linux' lub 'windows'"
+    error_message = "Dozwolone wartości dla 'os_type' to 'linux' lub 'windows'."
   }
 }
 
-# Konfiguracja Azure
 variable "subscription_id" {
-  description = "Docelowa subskrypcja Azure (pobierana z zmiennych środowiskowych)"
+  description = "Identyfikator subskrypcji Azure, w której będą tworzone zasoby."
   type        = string
+  sensitive   = true
 }
 
-# Bezpieczeństwo dostępu
 variable "ssh_public_key" {
-  description = "Klucz publiczny w formacie OpenSSH (generowany automatycznie)"
+  description = "Klucz publiczny SSH używany do logowania na maszyny Linux. Wymagany, jeśli os_type='linux'."
   type        = string
+  sensitive   = false # Klucze publiczne nie są zazwyczaj traktowane jako wrażliwe.
 }
 
-variable "ssh_private_key" {
-  description = "Prywatny klucz SSH (przechowywany w Azure Key Vault)"
-  type        = string
-  sensitive   = true  # Nigdy nie pokazywany w outputach
-}
-
-# Lokalizacja zasobów
 variable "location" {
-  description = "Region Azure zgodny z konwencją nazewnictwa (np. 'West Europe')"
+  description = "Region Azure, w którym zostaną utworzone zasoby (np. 'West Europe', 'East US')."
   type        = string
-  default     = "West Europe"
+  default     = "West Europe" # Domyślny region, jeśli nie zostanie podany.
+  sensitive   = false
 }
 
 variable "image_name" {
-  description = "Nazwa obrazu maszyny wirtualnej"
+  description = "Nazwa lub alias obrazu maszyny wirtualnej do użycia. Może to być alias obrazu z Marketplace (np. 'Ubuntu:22.04-lts-gen2') lub nazwa obrazu niestandardowego (np. 'windows10-pro')."
   type        = string
-  default     = "UbuntuLTS"  # Wartość domyślna dla szkoleń
-  
+  sensitive   = false
+}
+
+variable "allowed_source_ips" {
+  description = "Lista adresów IP lub zakresów CIDR, które będą miały dostęp do VM przez porty SSH/RDP/VNC zdefiniowane w NSG."
+  type        = list(string)
+  # UWAGA: Domyślnie zezwala na dostęp z dowolnego adresu IP. W środowiskach produkcyjnych należy to ograniczyć.
+  default   = ["0.0.0.0/0"]
+  sensitive = false
+}
+
+variable "linux_vm_size" {
+  description = "Rozmiar maszyny wirtualnej Azure używany dla systemu Linux."
+  type        = string
+  default     = "Standard_B1s" # Domyślny, ekonomiczny rozmiar dla Linux.
+  sensitive   = false
+}
+
+variable "windows_vm_size" {
+  description = "Rozmiar maszyny wirtualnej Azure używany dla systemu Windows."
+  type        = string
+  default     = "Standard_D2s_v3" # Domyślny rozmiar dla Windows, zazwyczaj wymaga więcej zasobów.
+  sensitive   = false
+}
+
+variable "custom_image_rg_name" {
+  description = "Nazwa grupy zasobów Azure, która zawiera niestandardowe obrazy maszyn wirtualnych."
+  type        = string
+  default     = "packer-images-rg" # Domyślna nazwa RG dla obrazów stworzonych np. przez Packer.
+  sensitive   = false
+}
+
+variable "destroy_timestamp_utc" {
+  description = "Opcjonalny znacznik czasu w formacie UTC (ISO 8601, np. YYYY-MM-DDTHH:MM:SSZ), wskazujący kiedy VM powinna zostać automatycznie zniszczona przez zewnętrzny proces czyszczący. Pozostaw pusty, aby wyłączyć."
+  type        = string
+  default     = "" # Domyślnie brak automatycznego niszczenia.
+  sensitive   = false
 }

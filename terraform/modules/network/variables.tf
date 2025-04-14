@@ -1,24 +1,29 @@
-# Unikalny identyfikator użytkownika
+# File: terraform/modules/network/variables.tf
+# Zmienne wejściowe wymagane przez moduł sieciowy.
+
 variable "user_id" {
-  description = "Unikalny identyfikator użytkownika (wymagany dla nazewnictwa i tagów)"
+  description = "Unikalny identyfikator użytkownika, używany do nazewnictwa zasobów sieciowych."
   type        = string
+  sensitive   = true
 }
 
-# Nazwa istniejącej grupy zasobów
 variable "resource_group_name" {
-  description = "Nazwa istniejącej grupy zasobów (output z modułu resource_group)"
+  description = "Nazwa grupy zasobów Azure, w której zostaną utworzone zasoby sieciowe."
   type        = string
 }
 
-# Region zgodny z notacją Azure (np. "West Europe")
-# Lista dostępnych: az account list-locations --output table
 variable "location" {
-  description = "Docelowy region Azure"
+  description = "Region Azure, w którym zostaną utworzone zasoby sieciowe."
   type        = string
 }
 
-# Zmienna warunkująca architekturę - wybór między dwoma wariantami
-variable "os_type" {
-  description = "System operacyjny maszyny wirtualnej: 'linux' lub 'windows' (case-insensitive)"
-  type        = string
+variable "allowed_source_ips" {
+  description = "Lista adresów IP lub zakresów CIDR dozwolonych w regule NSG dla ruchu przychodzącego."
+  type        = list(string)
+}
+
+variable "tags" {
+  description = "Mapa tagów do zastosowania dla zasobów sieciowych."
+  type        = map(string)
+  default     = {}
 }

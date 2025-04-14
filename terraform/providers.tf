@@ -1,35 +1,35 @@
-# File: /terraform/providers.tf
-# Konfiguracja dostawców i wersji Terraform
+# File: terraform/providers.tf
+# Konfiguracja Terraform i dostawców chmury (Azure).
+
 terraform {
-  required_version = ">= 1.10.5"  # Minimalna wersja Terraform
+  required_version = ">= 1.1.0" # Wymaga co najmniej wersji Terraform 1.1.0.
 
   required_providers {
+    # Dostawca do generowania losowych wartości, np. nazw.
     random = {
-      source  = "hashicorp/random"  # Provider do generowania losowych wartości
-      version = "3.6.3"
+      source  = "hashicorp/random"
+      version = "~> 3.6.0" # Używa wersji kompatybilnej z 3.6.0.
     }
-    cloudinit = {
-      source  = "hashicorp/cloudinit"  # Konfiguracja cloud-init
-      version = "2.3.5"
-    }
+    # Główny dostawca do zarządzania zasobami Azure.
     azurerm = {
-      source  = "hashicorp/azurerm"  # Oficjalny provider Azure
-      version = "4.3.0"
+      source  = "hashicorp/azurerm"
+      version = "~> 4.3.0" # Używa wersji kompatybilnej z 4.3.0.
     }
   }
 }
 
-# Konfiguracja providera Azure z zachowaniem bezpieczeństwa
 provider "azurerm" {
+  # Konfiguracja specyficznych zachowań dostawcy AzureRM.
   features {
     resource_group {
-      # Zezwolenie na usuwanie grupy z zasobami (dla celów szkoleniowych)
+      # Umożliwia usunięcie grupy zasobów, nawet jeśli zawiera zasoby.
+      # Przydatne w środowiskach tymczasowych/szkoleniowych.
       prevent_deletion_if_contains_resources = false
     }
     virtual_machine {
-      # Automatyczne usuwanie dysku OS przy usuwaniu VM
+      # Automatycznie usuwa dysk OS wraz z maszyną wirtualną.
       delete_os_disk_on_deletion = true
     }
   }
-  subscription_id = var.subscription_id  # ID subskrypcji z zmiennych
+  subscription_id = var.subscription_id # ID subskrypcji Azure pobierane ze zmiennej.
 }
